@@ -1,6 +1,6 @@
-# Freepik Compant Helm Charts
+# Freepik Company Helm Charts
 
-To add this repository in you repository list write the next command in your terminal:
+To add this repository in you repository list write next command in your terminal:
 
 ```bash
 $ helm repo add freepik-company https://freepik-company.github.io/charts/
