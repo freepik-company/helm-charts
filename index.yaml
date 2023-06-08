@@ -1,0 +1,45 @@
+apiVersion: v1
+entries:
+  hello-world:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2023-06-08T11:54:40.473811+02:00"
+    description: A Helm chart for Kubernetes
+    digest: 2be2310fac60e128c674be0b18b3c60f1ab4eed658a7a107a657f901702ad0ee
+    maintainers:
+    - email: jhalcon@freepik.com
+      name: jaimeph
+    - email: stejon@freepik.com
+      name: sergiotejon
+    name: hello-world
+    type: application
+    urls:
+    - https://github.com/freepik-company/helm-charts/releases/download/hello-world-0.1.0/hello-world-0.1.0.tgz
+    version: 0.1.0
+  pipeline-generator:
+  - apiVersion: v2
+    created: "2023-06-08T11:54:40.692962+02:00"
+    description: Create Tekton pipelines from a simple yalm file
+    digest: 860b6e2163e2449971309fdfba57d88d91653b15746c54927857540b8d84cb91
+    maintainers:
+    - email: stejon@freepik.com
+      name: sergiotejon
+    name: pipeline-generator
+    type: application
+    urls:
+    - https://github.com/freepik-company/helm-charts/releases/download/pipeline-generator-1.1.0/pipeline-generator-1.1.0.tgz
+    version: 1.1.0
+  pipeline-launcher:
+  - apiVersion: v2
+    created: "2023-06-08T11:54:40.920122+02:00"
+    description: Chart to install Pipeline Launcher engine
+    digest: 5cd37558ff3c4574abf3c90966337cd47b56fe4d426ecbd38add71b162bfa744
+    maintainers:
+    - email: stejon@freepik.com
+      name: sergiotejon
+    name: pipeline-launcher
+    type: application
+    urls:
+    - https://github.com/freepik-company/helm-charts/releases/download/pipeline-launcher-1.5.0/pipeline-launcher-1.5.0.tgz
+    version: 1.5.0
+generated: "2023-06-08T11:54:40.920132+02:00"
