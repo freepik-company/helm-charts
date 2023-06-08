@@ -1,0 +1,8 @@
+apiVersion: v2
+description: Chart to install Pipeline Launcher engine
+name: pipeline-launcher
+type: application
+version: 1.5.0
+maintainers:
+  - name: sergiotejon
+    email: stejon@freepik.com

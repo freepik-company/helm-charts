@@ -1,0 +1,49 @@
+{{- range .Values.listeners }}
+{{- $listenerName := .name -}}
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: {{ include "launcher.fullnameShort" $ }}-{{ $listenerName }}
+  labels:
+    {{- include "launcher.labels" $ | nindent 4 }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 -}}
+  {{- end }}
+spec:
+  serviceAccountName: {{ include "launcher.serviceAccountName" $ }}
+  triggers:
+  {{- range .triggers }}
+  - name: {{ .name }}
+    {{- with .interceptors }}
+    interceptors:
+      {{- toYaml . | nindent 8 -}}
+    {{- end }}
+    bindings:
+    - name: eventlistener
+      value: {{ include "launcher.fullnameShort" $ }}-{{ $listenerName }}
+    - name: trigger
+      value: {{ .name }}
+    - name: type
+      value: {{ .bindings.type }}
+    - name: project
+      value: {{ include "launcher.projectNameShort" . }}
+    - name: repository
+      value: {{ .bindings.repository }}
+    - name: branch
+      value: {{ .bindings.branch }}
+    - name: pipeline
+      value: {{ .bindings.pipeline }}
+    - name: commit
+      value: {{ .bindings.commit }}
+    - name: shortCommit
+      value: {{ .bindings.shortCommit }}
+    - name: author
+      value: {{ .bindings.author }}
+    - name: email
+      value: {{ .bindings.email }}
+    template:
+      ref: {{ include "launcher.fullname" $ }}-{{ $listenerName }}
+  {{- end }}
+---
+{{- end }}

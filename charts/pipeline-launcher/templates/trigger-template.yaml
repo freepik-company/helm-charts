@@ -1,0 +1,81 @@
+{{- range .Values.listeners }}
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ include "launcher.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "launcher.labels" $ | nindent 4 }}
+spec:
+  params:
+  - name: eventlistener
+  - name: trigger
+  - name: type
+  - name: project
+  - name: repository
+  - name: branch
+  - name: pipeline
+  - name: commit
+  - name: shortCommit
+  - name: author
+  - name: email
+
+  resourcetemplates:
+
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: $(tt.params.shortCommit)-$(tt.params.project)-
+      labels:
+        project: $(tt.params.project)
+        commit: $(tt.params.commit)
+        shortCommit: $(tt.params.shortCommit)
+    spec:
+      serviceAccountName: {{ include "launcher.serviceAccountName" $ }}
+      pipelineRef:
+        name: {{ include "launcher.fullname" $ }}-{{ .name }}
+      podTemplate:
+        {{- with $.Values.tolerations }}
+        tolerations:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $.Values.nodeSelector }}
+        nodeSelector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumes:
+        {{- if .gitCredentials }}
+        ## VER COMO HACER COMPATIBLE SIN CREDENCIALES
+        - name: git-credentials
+          {{- toYaml .gitCredentials | nindent 10 }}
+        {{- end }}
+        - name: workspace-data
+          {{- toYaml $.Values.workspaceData | nindent 10 }}
+        - name: pipelines-kubernetes-resources
+          configMap:
+            name: {{ include "launcher.fullname" $ }}
+
+      params:
+      - name: eventlistener
+        value: $(tt.params.eventlistener)
+      - name: trigger
+        value: $(tt.params.trigger)
+      - name: type
+        value: $(tt.params.type)
+      - name: project
+        value: $(tt.params.project)
+      - name: repository
+        value: $(tt.params.repository)
+      - name: branch
+        value: $(tt.params.branch)
+      - name: pipeline
+        value: $(tt.params.pipeline)
+      - name: commit
+        value: $(tt.params.commit)
+      - name: shortCommit
+        value: $(tt.params.shortCommit)
+      - name: author
+        value: $(tt.params.author)
+      - name: email
+        value: $(tt.params.email)
+---
+{{- end }}

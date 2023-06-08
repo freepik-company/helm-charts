@@ -1,0 +1,94 @@
+# -- API Version to use to build the pipeline
+apiVersion: "1.1.0"
+# -- Namespace where the pipeline will be installed
+namespace: default
+# -- If this variable is set to 'true' automatically the launcher process create the namespace and
+# service account needed to run the pipeline. The service account name will have the same name than the namespace.
+createNamespace: false
+# -- If `createNamespace` is set to 'true' it creates the namespace adding the labels here specified to it.
+# The value of this variables is a string of `keys=values` where `keys` is the name of the label and `values` its value.
+# Every `key=value` must be separated by a blank space.
+# Example: `customLabels: "custom.label2=value1 custom.label2=value2"
+customLabels: ""
+
+# Images used by the pipeline launcher
+images:
+  # -- GSutil image for GCS used to work with artifacts and cache packages (currently only GCS is supported)
+  gsutil: "gcr.io/cloud-builders/gsutil"
+  # -- Image with helm (gcloud, kubectl and tkn also) to parse the custom pipeline and install in the Tekton cluster like a PipelineRun CRD
+  helm: "europe-west1-docker.pkg.dev/fc-tekton/containers/gcloud-kubectl-helm-tkn@sha256:9b099394ce09adee91dc161ceafb2046f3c170e4eda304c8126df08282954567"
+
+charts:
+  # -- OCI image registry where the charts will be saved
+  OCIRegistry: europe-west1-docker.pkg.dev
+  # -- OCI image package of the pipeline generator chart
+  pipelineGenerator: europe-west1-docker.pkg.dev/fc-tekton/charts/pipeline-generator
+
+# Default values for configuration
+configuration:
+  # -- K8s secret name to authenticate with the git reposotiry if needed
+  gitCredentialsSecret: ""
+  # -- Type of pipeline to build. Currently the differents types supported are: 
+  # branches, tags, pull_requests and custom. 
+  # Custom is used only to be launched from a pipeline, 
+  # not from a remote event (webhook)
+  type: custom
+  # -- Bucket name to save artifacts and cache packages. Current GCS is only supported.
+  # TODO: When this program is free this will need to be changed to an example bucket name.
+  gcsBucket: fc-tekton-artifacts
+  # -- Global configuration for download policy images used on pipelines since 1.1.0.
+  defaultImagePullPolicy: IfNotPresent
+  # -- If an image name is not given in a step this image name will be used by default
+  defaultImage: alpine:edge
+  # -- Tekton workspace configuration to use in a pipeline. By default no workspace is used.
+  # More information in [Workspaces](https://tekton.dev/docs/pipelines/pipelineruns/#specifying-workspaces)
+  sharedDataWorkspace: {}
+  # -- Burnup and Burndown is enabled by dafault. These automatic steps are used 
+  # to download the code from the repository, the artifacts and cache packeges from
+  # GCS bucket and create the artifacts and cache packages and upload them is needed.
+  burnupAndBurndownEnabled: true
+  # -- If burnup is enabled this enable also the autoclone process to download from 
+  # the repository. This is enabled by default.
+  enableAutocloneRepo: true
+  # -- When AutocloneRepo is enabled, by default clone repository with 1 as depth
+  cloneDepth: 1
+  # -- If burnup and burndown is enabled this enable the artifact creation and
+  # its download process also. Enabled by dafault.
+  artifactsEnabled: true
+  # -- If burnup and burndown is enabled this enable the cache package creation and
+  # its download process also. Enabled by dafault.
+  cacheEnabled: true
+  # -- Author name of the email sent when a failure ocurr
+  author: nobody
+  # -- Email account where to send the email when a failure ocurr
+  email: nobody@example.com
+  # -- Tekton Dashboard URL used to create a link in the email sent when a failure ocurr. For debugging process.
+  tektonDashboardURL: http://tekton.example.com
+  # -- Name of the Task in Tekton which runs the process of sending the email. 
+  # The Task is installed with the launcher and its names depends of the release name given.
+  sendmailTaksName: fc-launcher-sendmail
+  # -- K8s secret with the information about the user account and the email server.
+  # More information about the structure [here](pipeline-launcher/README.md).
+  sendmailSecret: sendmail-secret
+  # -- Email account of the sender when a failure ocurr
+  sendmailSender: launcher@example.com
+  # -- Default subject of the email when a failure ocurr
+  sendmailSubject: Pipeline of project '$(params.project)' failed!
+  # -- Default body of the email when a failure ocurr
+  sendmailBody: |
+    $(params.author), the pipeline of the application '$(params.project)'  has failed.
+
+    Repository '$(params.repository)'.
+    Branch is '$(params.branch)'.
+    Commit '$(params.commit)'.
+
+    $(params.tektonDashboardURL)/#/namespaces/$(context.pipelineRun.namespace)/pipelineruns/$(context.pipelineRun.name)
+  # -- Node selector configuration to set the pod of the pipeline launcher instance
+  # [nodeSelector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector)
+  nodeSelector: {}
+  # -- Pod tolerations to run the pipelines launcher instances
+  # [tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)
+  tolerations: []
+
+# -- Pipeline configuration. More information below.
+pipelines: []

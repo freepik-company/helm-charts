@@ -1,0 +1,413 @@
+{{- /*
+Check the type of pipelines to run
+*/}}
+{{- range $key, $pipelines := .Values.pipelines }}
+{{- if eq $key $.Values.configuration.type }}
+{{- range $pipelines }}
+{{- /*
+Regex match the name of the current branch to template it
+*/}}
+{{- if regexMatch .regex $.Values.configuration.pipeline }}
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: {{ $.Values.configuration.shortCommit }}-{{ .name }}-{{ $.Values.configuration.projectName }}-
+  namespace: {{ $.Values.namespace }}
+  labels:
+    triggers.tekton.dev/eventlistener: {{ $.Values.configuration.eventlistener | quote }}
+    triggers.tekton.dev/trigger: {{ $.Values.configuration.trigger | quote }}
+    apiVersion: {{ $.Values.apiVersion | quote }}
+    commit: {{ $.Values.configuration.commit | quote }}
+    shortCommit: {{ $.Values.configuration.shortCommit | quote }}
+    projectName: {{ $.Values.configuration.projectName | quote }}
+    pipelineName: {{ .name | quote }}
+    type: {{ $.Values.configuration.type | quote }}
+spec:
+  params:
+  {{- include "arguments.pipeline" $ | indent 2 }}
+  {{- if .serviceAccount }}
+  serviceAccountName: {{ .serviceAccount }}
+  {{- end }}
+  {{- /*
+  Common configuration of every pod templated
+  */}}
+  podTemplate:
+    {{- if $.Values.configuration.tolerations }}
+    tolerations:
+      {{- toYaml $.Values.configuration.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if $.Values.configuration.nodeSelector }}
+    nodeSelector:
+      {{- toYaml $.Values.configuration.nodeSelector | nindent 6 }}
+    {{- end }}
+    volumes:
+    {{- if $.Values.configuration.gitCredentialsSecret }}
+    - name: git-credentials
+      secret:
+        secretName: {{ $.Values.configuration.gitCredentialsSecret }}
+    {{- end }}
+    {{- if not $.Values.configuration.sharedDataWorkspace }}
+    - name: workspace-data
+      emptyDir: {}
+    {{- end }}
+  {{- with $.Values.configuration.sharedDataWorkspace }}
+  workspaces:
+  - name: workspace-data
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  pipelineSpec:
+    params:
+    {{- include "parameters.pipeline" $ | indent 4 }}
+    {{- if $.Values.configuration.sharedDataWorkspace }}
+    workspaces:
+    - name: workspace-data
+    {{- end }}
+    tasks:
+    {{- /*
+    Loop steps in the pipeline configuration to make custom tasks of tekton.
+    Each task has three task steps:
+    - burnup: Clone the repository from the given commit and download whatever artifact and/or cache data we have for this hash
+    - run: Execute out custom script the make the actual work of the step
+    - burndown: Make the packages for the artifacts and cache data, if needed, and upload them to a bucket
+    */}}
+    {{- range .steps }}
+    - name: {{ .name }}
+      {{- with .runAfter }}
+      runAfter:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- if $.Values.configuration.sharedDataWorkspace }}
+      workspaces:
+      - name: workspace-data
+        workspace: workspace-data
+      {{- end }}
+      params:
+      {{- include "arguments.common" $.Values.configuration | indent 6 }}
+      - name: artifacts
+        value: {{- if .artifacts }} {{ range .artifacts }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+      - name: cache
+        value: {{- if .cache }} {{ range .cache }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+      {{- /* Custom params */}}
+      {{- with .params }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      taskSpec:
+        {{- if .description }}
+        description: |
+          {{ .description }}
+        {{- end }}
+        {{- if .results }}
+        results:
+        {{- range .results }}
+        - name: {{ . }}
+        {{- end }}
+        {{- end }}
+        params:
+        {{- include "parameters.common" $ | indent 8}}
+        {{- /* Custom param names */}}
+        {{- range .params }}
+        - name: {{ .name }}
+        {{- end }}
+        {{- with .volumes }}
+        {{- /* Custom volumes. */}}
+        volumes:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if $.Values.configuration.sharedDataWorkspace }}
+        workspaces:
+        - name: workspace-data
+          mountPath: /fc/workspace-data
+        {{- end }}
+        {{- with .sidecars }}
+        sidecars:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        steps:
+        {{- /* Clone repository and download artifacts and cache data */}}
+        {{- $burnupActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+        {{- if .burnupEnabled }}
+        {{- $burnupActive = .burnupEnabled }}
+        {{- end }}
+        {{- if eq $burnupActive "true" }}
+        {{- include "burnup" $ | indent 8}}
+        {{- end }}
+        {{- /* Run actual script */}}
+        - name: run
+          image: {{ .image | default $.Values.configuration.defaultImage | quote }}
+          imagePullPolicy: {{ .imagePullPolicy | default $.Values.configuration.defaultImagePullPolicy | quote }}
+          {{- /* Common and custom volumes. */}}
+          volumeMounts:
+          {{- if $.Values.configuration.gitCredentialsSecret }}
+          - name: git-credentials
+            mountPath: /fc/git-credentials
+          {{- end }}
+          {{- if not $.Values.configuration.sharedDataWorkspace }}
+          - name: workspace-data
+            mountPath: /fc/workspace-data
+          {{- end }}
+          {{- range .volumes }}
+          - name: {{ .name }}
+            mountPath: /mnt/{{ .name }}
+          {{- end }}
+          workingDir: "/fc/workspace-data"
+          {{- with .env }}
+          env:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .command }}
+          command:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .args }}
+          args:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- if .script }}
+          script: |
+            {{- .script | nindent 12 }}
+          {{- end }}
+        {{- /* Updload current just generated artifacts and cache data */}}
+        {{- $burndownActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+        {{- if eq .burndownEnabled "false" }}
+        {{- $burndownActive = "false" }}
+        {{- end }}
+        {{- if eq $burndownActive "true" }}
+        {{- include "burndown" $ | indent 8 }}
+        {{- end }}
+    {{- end }}
+    {{- /*
+    If it's configured in the pipeline this steps are executed when the main pipeline has finished.
+    These steps must be configured with a condition state to run them only when a specified state of the 
+    pipeline is given (Successed or Failed). If no condition is given, the step runs whatever condition
+    state the pipeline has when it has finished.
+    */}}
+    finally:
+      {{- /*  Sendmail if pipeline fails */}}
+      - name: sendmail-failed
+        {{- include "sendmail" $ | indent 8 }}
+    {{- /* Loop custom finish step in the pipeline */}}
+    {{- range .finishSteps }}
+      - name: {{ .name }}
+        {{- /* Condition state configuration */}}
+        {{- if eq .condition "success" }}
+        {{- include "success.status" $ | indent 8 }}
+        {{- end }}
+        {{- if eq .condition "failed" }}
+        {{- include "failed.status" $ | indent 8 }}
+        {{- end }}
+        {{- if $.Values.configuration.sharedDataWorkspace }}
+        workspaces:
+        - name: workspace-data
+          workspace: workspace-data
+        {{- end }}
+        params:
+        {{- include "arguments.common" $.Values.configuration | indent 8 }}
+        - name: artifacts
+          value: {{- if .artifacts }} {{ range .artifacts }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        - name: cache
+          value: {{- if .cache }} {{ range .cache }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        {{- /* Custom params */}}
+        {{- with .params }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        taskSpec:
+          {{- if .description }}
+          description: |
+            {{ .description }}
+          {{- end }}
+          params:
+          {{- include "parameters.common" $ | indent 10 }}
+          {{- /* Custom param names */}}
+          {{- range .params }}
+          - name: {{ .name }}
+          {{- end }}
+          {{- with .volumes }}
+          {{- /* Custom volumes. */}}
+          volumes:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- if $.Values.configuration.sharedDataWorkspace }}
+          workspaces:
+          - name: workspace-data
+            mountPath: /fc/workspace-data
+          {{- end }}
+          steps:
+          {{- /* Clone repository and download artifacts and cache data */}}
+          {{- $burnupActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if .burnupEnabled }}
+          {{- $burnupActive = .burnupEnabled }}
+          {{- end }}
+          {{- if eq $burnupActive "true" }}
+          {{- include "burnup" $ | indent 10}}
+          {{- end }}
+          {{- /* Run actual script */}}
+          - name: run
+            image: {{ .image | default $.Values.configuration.defaultImage | quote }}
+            imagePullPolicy: {{ .imagePullPolicy | default $.Values.configuration.defaultImagePullPolicy | quote }}
+            {{- /* Common and custom volumes. */}}
+            volumeMounts:
+            {{- if $.Values.configuration.gitCredentialsSecret }}
+            - name: git-credentials
+              mountPath: /fc/git-credentials
+            {{- end }}
+            {{- if not $.Values.configuration.sharedDataWorkspace }}
+            - name: workspace-data
+              mountPath: /fc/workspace-data
+            {{- end }}
+            {{- range .volumes }}
+            - name: {{ .name }}
+              mountPath: /mnt/{{ .name }}
+            {{- end }}
+            workingDir: "/fc/workspace-data"
+            {{- with .env }}
+            env:
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .command }}
+            command:
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .args }}
+            args:
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .script }}
+            script: |
+              {{- .script | nindent 14 }}
+            {{- end }}
+          {{- /* Updload current just generated artifacts and cache data */}}
+          {{- $burndownActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if eq .burndownEnabled "false" }}
+          {{- $burndownActive = "false" }}
+          {{- end }}
+          {{- if eq $burndownActive "true" }}
+          {{- include "burndown" $ | indent 10 }}
+          {{- end }}
+    {{- end }}
+    {{- /*
+    These two special steps/tasks are here to launch a new pipeline from the list of pipelines in the configuration when a success or a failed
+    state condition emerge. This can be useful to lauch new pipelines to act when a previous pipeline has finished, for example when a CI pipeline
+    finish successfuly we want to lauch a new pipeline for the CD process.
+    */}}
+    {{- if .nextPipeline }}
+      {{- /* Special finish successfuly step */}}
+      {{- if .nextPipeline.success }}
+      - name: pipeline-launch-success
+        {{- include "success.status" $ | indent 8 }}
+        {{- if $.Values.configuration.sharedDataWorkspace }}
+        workspaces:
+        - name: workspace-data
+          workspace: workspace-data
+        {{- end }}
+        params:
+        {{- include "arguments.common" $.Values.configuration | indent 8 }}
+        - name: projectName
+          value: {{ $.Values.configuration.projectName }}
+        - name: type
+          value: custom
+        - name: pipeline
+          value: {{ .nextPipeline.success }}
+        - name: eventlistener
+          value: {{ $.Values.configuration.eventlistener }}
+        - name: trigger
+          value: {{ $.Values.configuration.trigger }}
+        - name: artifacts
+          value: {{- if .artifacts }} {{ range .artifacts }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        - name: cache
+          value: {{- if .cache }} {{ range .cache }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        - name: tektonDashboardURL
+          value: $(params.tektonDashboardURL)
+        taskSpec:
+          params:
+          {{- include "parameters.common" $ | indent 10 }}
+          - name: projectName
+          - name: type
+          - name: pipeline
+          - name: eventlistener
+          - name: trigger
+          - name: tektonDashboardURL
+          {{- if $.Values.configuration.sharedDataWorkspace }}
+          workspaces:
+          - name: workspace-data
+            mountPath: /fc/workspace-data
+          {{- end }}
+          steps:
+          {{- $burnupActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if .nextPipeline.burnupEnabled }}
+          {{- $burnupActive = .nextPipeline.burnupEnabled }}
+          {{- end }}
+          {{- if eq $burnupActive "true" }}
+          {{- include "burnup" $ | indent 10}}
+          {{- end }}
+          {{- include "pipeline.generator" $ | indent 10 }}
+          {{- $burndownActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if eq .nextPipeline.burndownEnabled "false" }}
+          {{- $burndownActive = "false" }}
+          {{- end }}
+          {{- if eq $burndownActive "true" }}
+          {{- include "burndown" $ | indent 10 }}
+          {{- end }}
+      {{- end }}
+      {{- /* Special finish fail step */}}
+      {{- if .nextPipeline.failed }}
+      - name: pipeline-launch-failed
+        {{- include "failed.status" $ | indent 8 }}
+        {{- if $.Values.configuration.sharedDataWorkspace }}
+        workspaces:
+        - name: workspace-data
+          workspace: workspace-data
+        {{- end }}
+        params:
+        {{- include "arguments.common" $.Values.configuration | indent 8 }}
+        - name: projectName
+          value: {{ $.Values.configuration.projectName }}
+        - name: type
+          value: custom
+        - name: pipeline
+          value: {{ .nextPipeline.failed }}
+        - name: eventlistener
+          value: {{ $.Values.configuration.eventlistener }}
+        - name: trigger
+          value: {{ $.Values.configuration.trigger }}
+        - name: artifacts
+          value: {{- if .artifacts }} {{ range .artifacts }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        - name: cache
+          value: {{- if .cache }} {{ range .cache }}{{ . }} {{ end }}{{- else }} "" {{- end }}
+        - name: tektonDashboardURL
+          value: $(params.tektonDashboardURL)
+        taskSpec:
+          params:
+          {{- include "parameters.common" $ | indent 10 }}
+          - name: projectName
+          - name: type
+          - name: pipeline
+          - name: eventlistener
+          - name: trigger
+          - name: tektonDashboardURL
+          {{- if $.Values.configuration.sharedDataWorkspace }}
+          workspaces:
+          - name: workspace-data
+            mountPath: /fc/workspace-data
+          {{- end }}
+          steps:
+          {{- $burnupActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if .nextPipeline.burnupEnabled }}
+          {{- $burnupActive = .nextPipeline.burnupEnabled }}
+          {{- end }}
+          {{- if eq $burnupActive "true" }}
+          {{- include "burnup" $ | indent 10 }}
+          {{- end }}
+          {{- include "pipeline.generator" $ | indent 10 }}
+          {{- $burndownActive := default $.Values.configuration.burnupAndBurndownEnabled "true" }}
+          {{- if eq .nextPipeline.burndownEnabled "false" }}
+          {{- $burndownActive = "false" }}
+          {{- end }}
+          {{- if eq $burndownActive "true" }}
+          {{- include "burndown" $ | indent 10 }}
+          {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
