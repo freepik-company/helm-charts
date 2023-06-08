@@ -3,7 +3,7 @@
 To add this repository in you repository list write next command in your terminal:
 
 ```bash
-$ helm repo add freepik-company https://freepik-company.github.io/charts/
+$ helm repo add freepik-company https://freepik-company.github.io/helm-charts/
 ```
 
 Next command will update the repositories information in you computer:

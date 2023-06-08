@@ -1,0 +1,5 @@
+Ingress configuration:
+Set your repository webhook configuration targeting to (select the right one):
+{{- range .Values.listeners }}
+- http://[HOST]/{{ include "launcher.fullnameShort" $ }}-{{ .name }}
+{{- end }}
