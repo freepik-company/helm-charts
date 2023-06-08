@@ -3,6 +3,21 @@ entries:
   hello-world:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2023-06-08T12:47:03.438659+02:00"
+    description: Hello world test
+    digest: 1a92d93e105dcf020c4b108c363646ae847302ba93f0a41aa0a7be940cb3c497
+    maintainers:
+    - email: jhalcon@freepik.com
+      name: jaimeph
+    - email: stejon@freepik.com
+      name: sergiotejon
+    name: hello-world
+    type: application
+    urls:
+    - https://github.com/freepik-company/helm-charts/releases/download/hello-world-0.1.1/hello-world-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2023-06-08T11:54:40.473811+02:00"
     description: A Helm chart for Kubernetes
     digest: 2be2310fac60e128c674be0b18b3c60f1ab4eed658a7a107a657f901702ad0ee
@@ -42,4 +57,4 @@ entries:
     urls:
     - https://github.com/freepik-company/helm-charts/releases/download/pipeline-launcher-1.5.0/pipeline-launcher-1.5.0.tgz
     version: 1.5.0
-generated: "2023-06-08T11:54:40.920132+02:00"
+generated: "2023-06-08T12:47:03.921132+02:00"
