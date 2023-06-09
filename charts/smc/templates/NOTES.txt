@@ -1,0 +1,3 @@
+Controlador instalado.
+
+Release desplegada con un Deployment de  1 réplica en {{ .Release.Namespace }}.
