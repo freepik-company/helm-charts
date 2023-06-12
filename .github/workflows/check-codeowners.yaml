@@ -1,4 +1,4 @@
-name: Check CODEOWNERS
+name: check-codeowners
 
 on: workflow_call
 

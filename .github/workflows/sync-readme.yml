@@ -1,4 +1,4 @@
-name: Sync README.md
+name: sync-readme
 
 on:
   push:
