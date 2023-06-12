@@ -1,5 +1,8 @@
 name: lint-test-charts
 
+on:
+  workflow_call:
+
 jobs:
   lint-test:
     runs-on: ubuntu-latest
