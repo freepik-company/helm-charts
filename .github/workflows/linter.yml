@@ -1,4 +1,4 @@
-name: Lint Code Base
+name: lint-code-base
 
 on:
   workflow_dispatch:
@@ -14,8 +14,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Docs
         run: scripts/check-helm-docs.sh
