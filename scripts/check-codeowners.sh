@@ -10,8 +10,7 @@ cat <<EOF
 * @freepik-company/foss
 EOF
 
-for DIR in ./charts/*
-do
+for DIR in ./charts/*; do
 	FILE="$DIR/Chart.yaml"
 	DIR="${DIR//\./}"
 	MAINTAINERS="$(yq e '.maintainers.[].name' "$FILE" | sed 's/^/@/' | sort --ignore-case | tr '\r\n' ' ')"

@@ -18,7 +18,7 @@ main() {
 	fi
 
 	local num_changed
-	num_changed=$(wc -l <<< "$changed")
+	num_changed=$(wc -l <<<"$changed")
 
 	if ((num_changed > 1)); then
 		echo "This PR has changes to multiple charts. Please create individual PRs per chart." >&2
