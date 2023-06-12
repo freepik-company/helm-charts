@@ -22,9 +22,18 @@ serviceAccount:
   name: ""
 
 # CRDs permissions. Example default values
-kopfCRDs: [secretmanagercontrollers]
-resourcesManipulation: [secrets]
-resourcesVerbs: [create,get,patch,update,delete]
+kopfCRDs:
+  - secretmanagercontrollers
+
+resourcesManipulation:
+  - secrets
+
+resourcesVerbs:
+  - create
+  - get
+  - patch
+  - update
+  - delete
 
 podAnnotations: {}
 
