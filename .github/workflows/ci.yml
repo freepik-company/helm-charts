@@ -4,8 +4,8 @@ on: pull_request
 
 jobs:
   call-check-codeowners:
-    uses: ./.github/workflows/check-codeowners.yaml
+    uses: ./.github/workflows/check-codeowners.yml
   call-lint:
     uses: ./.github/workflows/linter.yml
-  # call-lint-test:
-  #   uses: ./.github/workflows/lint-test.yaml
+  call-lint-test:
+    uses: ./.github/workflows/lint-test.yml
