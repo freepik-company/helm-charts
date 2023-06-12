@@ -1,7 +1,6 @@
 name: lint-code-base
 
 on:
-  workflow_dispatch:
   workflow_call:
     inputs:
       filter_regex_include:

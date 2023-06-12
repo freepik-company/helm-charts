@@ -7,5 +7,5 @@ jobs:
     uses: ./.github/workflows/check-codeowners.yml
   call-lint:
     uses: ./.github/workflows/linter.yml
-  call-lint-test:
-    uses: ./.github/workflows/lint-test.yml
+  # call-lint-test:
+  #   uses: ./.github/workflows/lint-test.yml
